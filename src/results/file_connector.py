@@ -83,20 +83,20 @@ class FileConnector(BaseConnector):
             self.prompt_idx_stream = prompt_idx_stream
 
     def _store_eval_results(self, evaluation_result):
-        return self.result_stream.write(json.dumps(evaluation_result))
+        return self.result_stream.write(json.dumps(evaluation_result, indent=4))
 
     def _store_final_result(self, final_result):
         with open(self.run_folder / "final_result.json", "w") as final_result_file:
-            final_result_file.write(json.dumps(final_result))
+            final_result_file.write(json.dumps(final_result, indent=4))
 
     def results_exist(self) -> bool:
         return os.path.exists(self.run_folder / "final_result.json")
 
     def _store_prompt(self, prompt_entry) -> int:
-        return self.prompt_stream.write(json.dumps(prompt_entry))
+        return self.prompt_stream.write(json.dumps(prompt_entry, indent=4))
 
     def _store_prompt_idx(self, log_entry) -> int:
-        return self.prompt_stream.write(json.dumps(log_entry))
+        return self.prompt_stream.write(json.dumps(log_entry, indent=4))
 
     def __enter__(self) -> "FileConnector":
         return self

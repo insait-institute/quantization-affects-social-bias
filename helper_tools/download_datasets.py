@@ -43,7 +43,7 @@ def save_dataset_from_hf(hf_path, dataset_path, folder_name, split='train', data
     dataset = load_dataset(hf_path, split=split, name=name)
     dataset.save_to_disk(final_path)
 
-DATASETS_PATH = "../benchmark_datasets/"
+DATASETS_PATH = "./benchmark_datasets/"
 
 save_dataset_from_github("https://raw.githubusercontent.com/moinnadeem/StereoSet/refs/heads/master/data/dev.json", DATASETS_PATH, "stereo_set")
 
@@ -61,6 +61,11 @@ save_dataset_from_github("https://raw.githubusercontent.com/amazon-science/bold/
 
 save_dataset_from_github("https://raw.githubusercontent.com/AI-secure/DecodingTrust/refs/heads/main/data/toxicity/user_prompts/toxic.jsonl.gpt4.n%3D25.out1.split.annotated.jsonl.filtered.jsonl", DATASETS_PATH, "decoding_trust_toxicity", "toxic_prompts_gpt4")
 time.sleep(5)
+
+save_dataset_from_github("https://raw.githubusercontent.com/nyu-mll/BBQ/refs/heads/main/supplemental/additional_metadata.csv", DATASETS_PATH, "bbq", "additional_metadata")
+save_dataset_from_github("https://raw.githubusercontent.com/nyu-mll/BBQ/refs/heads/main/data/Gender_identity.jsonl", DATASETS_PATH, "bbq", "Gender_identity")
+save_dataset_from_github("https://raw.githubusercontent.com/nyu-mll/BBQ/refs/heads/main/data/Race_ethnicity.jsonl", DATASETS_PATH, "bbq", "Race_ethnicity")
+save_dataset_from_github("https://raw.githubusercontent.com/nyu-mll/BBQ/refs/heads/main/data/Religion.jsonl", DATASETS_PATH, "bbq", "Religion")
 
 save_dataset_from_github("https://raw.githubusercontent.com/uclanlp/corefBias/refs/heads/master/WinoBias/wino/data/anti_stereotyped_type1.txt.test", DATASETS_PATH, "wino_bias", "anti_stereotyped_type1")
 save_dataset_from_github("https://raw.githubusercontent.com/uclanlp/corefBias/refs/heads/master/WinoBias/wino/data/anti_stereotyped_type2.txt.test", DATASETS_PATH, "wino_bias", "anti_stereotyped_type2")

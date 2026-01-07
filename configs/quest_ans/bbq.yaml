@@ -1,0 +1,22 @@
+data_config: &data_config
+  type: "bbq_data"
+  debug: false
+  subset_size: 10
+  category: ["gender", "race" ,"religion"]
+
+config:
+  run_id: 1
+  seed: 36
+  benchmark_configs:
+    - name: "bbq"
+      type: "bbq"
+      provider: "local"
+      data_config: *data_config
+      num_workers: 1
+      max_length: 2000
+      postprocessor: 
+        type: "reformat_bbq"
+
+info:
+  license: "CC-BY-4.0 License"
+  source: "https://github.com/nyu-mll/BBQ"

@@ -25,32 +25,62 @@ import torch
 
 class VLLMLogitsRetriever:
     def __init__(self, tokenizer, options_map):
-        keys = list(options_map.keys())
-        input_ids = tokenizer(keys, padding=False, truncation=False)['input_ids']
-        token_ids = {tok_ids[-1] : options_map[keys[i]] for i, tok_ids in enumerate(input_ids)}
-        self.id_to_str = {tok_ids[-1] : keys[i] for i, tok_ids in enumerate(input_ids)}
-        self.tok_ids = list(token_ids.keys())
-        self.ans_ids = list(token_ids.values())
+        self.base_to_toks = {base : [] for base in options_map.keys()}
+        self.id_to_tok = {}
+        self.tok_to_base = {}
 
+        for base, toks in options_map.items():
+            for tok in toks:
+                id = tokenizer.encode(tok, add_special_tokens=False)
+                if len(id) > 1:
+                    print(f"[Info] - Option <{tok}> has more than one token id: {id}. Excluded")
+                else:
+                    self.base_to_toks[base].append(tok)
+                    self.id_to_tok[id[-1]] = tok
+                    self.tok_to_base[tok] = base
+
+        self.soft_max = {k : [] for k in self.base_to_toks.keys()}
+        self.is_top = []
         self.pred = []
-        self.soft_max = {k : [] for k in keys}
+        self.prob = []
+        self.tokenizer = tokenizer
 
     def __call__(self, token_ids, logits):
         if token_ids == ():
-            sub_logits = logits[self.tok_ids]
-            self.pred.append(self.ans_ids[torch.argmax(sub_logits)])
-            soft_max = torch.nn.functional.softmax(sub_logits, dim=0).to(dtype=float).cpu().numpy()
+            ids = list(self.id_to_tok.keys())
+            ans_str = list(self.tok_to_base.keys())
 
-            for id, sm in zip(self.tok_ids, soft_max):
-                self.soft_max[self.id_to_str[id]].append(sm)
+            most_prop_tok = torch.argmax(logits)
+            self.is_top.append(most_prop_tok in ids)
+
+            soft_max = torch.nn.functional.softmax(logits, dim=0).to(dtype=float).cpu().numpy()
+            sub_logits = soft_max[ids]
+            self.pred.append(self.tok_to_base[ans_str[np.argmax(sub_logits)]])
+
+            prob_sum = {k : 0 for k in self.base_to_toks.keys()}
+            for ans, sm in zip(ans_str, sub_logits):
+                prob_sum[self.tok_to_base[ans]] += sm
+                
+            for k, v in prob_sum.items():
+                self.soft_max[k].append(v)
+
+            self.prob.append(sum(prob_sum.values()))
 
         return logits
-    
+
     def get_answers(self):
         return self.pred
     
     def get_soft_max(self):
         return self.soft_max
+    
+    def get_all(self):
+        return {
+            "answers" : self.pred,
+            "soft_max" : self.soft_max,
+            "prob_sum" : self.prob,
+            "is_top" : self.is_top
+        }
 
 class VLLMCausalLM(BaseModel):
     AUTO_TOKENIZER_CLASS = AutoTokenizer
@@ -69,6 +99,7 @@ class VLLMCausalLM(BaseModel):
         self._padding_side = config.padding_side
         self._provider = config.provider
         self._seed = config.seed
+
         assert (self._provider == ModelProvider.VLLM)
 
         self.kvc_allowed_quant = ["auto", "fp8", "fp8_e4m3", "fp8_e5m2"]
@@ -91,7 +122,7 @@ class VLLMCausalLM(BaseModel):
 
         self.sampling_params = self._set_sampling_params(config.generation_args)
         self.num_pmt_toks, self.num_gen_toks, self.num_tot_prmt, self.num_tot_gens = 0, 0, 0, 0
-    
+
     # TO implement
     def loglikelihood(self, prompts):
         return self._loglikelihood(prompts)[0]
@@ -103,8 +134,8 @@ class VLLMCausalLM(BaseModel):
     # TO implement
     def most_prob_options(self, prompts, anwers, get_soft_max=True):
         get_logits = VLLMLogitsRetriever(self.tokenizer, anwers)
-        sp = SamplingParams(max_tokens=1, truncate_prompt_tokens=self._max_length, detokenize=False, logits_processors=[get_logits])
-        outputs = self.model.generate(prompts, sampling_params=sp)
+        temp_sampling_params = self._get_temp_updated_sampling_params({"max_tokens" : 1, "detokenize" : True, "truncate_prompt_tokens" : self._max_length, "logits_processors" : [get_logits]})
+        outputs = self.model.generate(prompts, sampling_params=temp_sampling_params)
 
         for prompts in outputs:
             # statistics:
@@ -114,14 +145,21 @@ class VLLMCausalLM(BaseModel):
             self.num_tot_gens += 1
 
         if get_soft_max:
-            return get_logits.get_soft_max()
+            outputs = get_logits.get_soft_max()
+        else:
+            outputs = get_logits.get_all()
 
-        return get_logits.get_answers()
+        return outputs
 
     # TO implement
     def generate(self, input, n=1, max_tokens=None):
+        flag_regroup = False
+        if n > 1:
+            input = np.repeat(input, n)
+            flag_regroup = True
+
         max_tokens = max_tokens if max_tokens is not None and max_tokens > 0 else self._max_gen_toks
-        temp_sampling_params = self._get_temp_updated_sampling_params({"max_tokens" : max_tokens, "n" : n})
+        temp_sampling_params = self._get_temp_updated_sampling_params({"max_tokens" : max_tokens})
         outputs = self.model.generate(input, sampling_params=temp_sampling_params)
 
         list_output = []
@@ -138,6 +176,9 @@ class VLLMCausalLM(BaseModel):
 
         if len(list_output[0]) == 1:
             list_output = [gen[0] for gen in list_output]
+
+        if flag_regroup:
+            list_output = np.array(list_output).reshape(-1, n).tolist()
 
         return list_output
     

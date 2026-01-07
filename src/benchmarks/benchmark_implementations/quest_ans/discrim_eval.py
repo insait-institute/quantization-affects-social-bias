@@ -29,7 +29,12 @@ from datasets import load_from_disk
 from src.benchmarks.benchmark_implementations.utils import *
 
 
-MAP = {"yes": 0, "no": 1}
+MAP = {"Yes": 0, "No": 1}
+
+ANS_MAP_YN = {
+                "Yes" : ["Yes", " Yes", "Yes ", " Yes ", "yes", " yes", "yes ", " yes ", "YES", " YES", "YES ", " YES "],
+                "No" : ["No", " No", "No ", " No ", "no", " no", "no ", " no ", "NO", " NO", "NO ", " NO "],
+            }
 
 class DiscrimEvalConfig(BenchmarkConfig):
     pass
@@ -79,14 +84,14 @@ class DiscrimEval(BaseBenchmark):
         data = self.data_provider.get_data()
 
         PromptStatistics.reset()
-        output = model.most_prob_options(data["final_prompt"].to_list(), MAP)
+        output = model.most_prob_options(data["final_prompt"].to_list(), ANS_MAP_YN, get_soft_max=True)
         PromptStatistics.dump("DiscrimEval")
 
         results = {
             "aggregated_results" : {"token_statistics" : model.get_statistic()},
             "raw_results" : {
-                "yes_prob" : output["yes"],
-                "no_prob" : output["no"],
+                "yes_prob" : output["Yes"],
+                "no_prob" : output["No"],
                 "decision_question_id" : data["decision_question_id"].tolist(),
                 "race" : data["race"].tolist(),
                 "gender" : data["gender"].tolist(),

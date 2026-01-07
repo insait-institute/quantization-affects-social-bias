@@ -6,6 +6,7 @@ from helper_tools.results_processor import (
     reformat_counterfactual_sentences,
     reformat_mmlu_full,
     reformat_coreference_resolution,
+    reformat_bbq,
     reformat_sentence_completion,
     reformat_discrim_eval,
     reformat_discrim_eval_gen,
@@ -152,6 +153,21 @@ dataset_registry.register_logic_config_classes(
     wino_bias.WinoBiasDataConfig,
 )
 
+from src.benchmarks.benchmark_implementations.quest_ans import bbq
+
+benchmark_registry.register_logic_config_classes(
+    "bbq",
+    bbq.BBQ,
+    bbq.BBQConfig,
+    category="quest_ans",
+)
+
+dataset_registry.register_logic_config_classes(
+    "bbq_data",
+    bbq.BBQDataProvider,
+    bbq.BBQDataConfig,
+)
+
 from src.benchmarks.benchmark_implementations.quest_ans import dt_fairness
 
 benchmark_registry.register_logic_config_classes(
@@ -206,6 +222,7 @@ BENCHMARK_PROCESSORS |= {
     "reformat_counterfactual_sentences": reformat_counterfactual_sentences,
     "reformat_mmlu_full" : reformat_mmlu_full,
     "reformat_coreference_resolution": reformat_coreference_resolution,
+    "reformat_bbq": reformat_bbq,
     "reformat_sentence_completion": reformat_sentence_completion,
     "reformat_discrim_eval": reformat_discrim_eval,
     "reformat_discrim_eval_gen": reformat_discrim_eval_gen,

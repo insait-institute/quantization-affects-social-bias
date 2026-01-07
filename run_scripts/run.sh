@@ -30,7 +30,6 @@ run_job () {
 
 
 mkdir -p results/runs/$RUN_NAME/$TIMESTAMP
-
 echo "Capabilities"
 echo "└── MMLU"
 run_job configs/quest_ans/mmlu_full.yaml
@@ -42,6 +41,8 @@ echo "└── RedditBias"
 run_job configs/counter_sents/reddit_bias.yaml 10
 echo "└── WinoBias"
 run_job configs/quest_ans/wino_bias.yaml
+echo "└── BBQ"
+run_job configs/quest_ans/bbq.yaml
 
 echo "Fairness"
 echo "└── DiscrimEval"

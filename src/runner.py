@@ -45,7 +45,7 @@ def get_json_results(results: List[BaseResult]) -> str:
         json_result = model_results.model_dump_json()
 
     except ValidationError:
-        json_result = json.dumps(results)
+        json_result = json.dumps(results, indent=4)
 
     return json_result
 

@@ -39,6 +39,9 @@ from src.benchmarks.benchmark_implementations.utils import *
 # This is used to version the generated JSON summary.
 RESULTS_VERSION = "1"
 
+def reformat_bbq(eval_results: dict, legacy: bool = False) -> dict:
+    data = _get_data(eval_results, legacy)
+    return data
 
 def reformat_dt_fairness(eval_results: dict, legacy: bool = False) -> dict:
     data = _get_data(eval_results, legacy)
@@ -387,6 +390,7 @@ BENCHMARK_PROCESSORS = {
     "stereo_set": reformat_counterfactual_sentences,
     "reddit_bias": reformat_counterfactual_sentences,
     "wino_bias": reformat_coreference_resolution,
+    "bbq": reformat_bbq,
     "discrim_eval": reformat_discrim_eval,
     "discrim_eval_gen": reformat_discrim_eval_gen,
     "dt_fairness": reformat_dt_fairness,
@@ -479,7 +483,7 @@ def update_results(parent_path):
             print(f"Exception:\n{e}")
 
     with open(parent_path + "/final_result.json" , "w") as f:
-        json.dump(run_info, f)
+        json.dump(run_info, f, indent=4)
 
 
 if __name__ == "__main__":
