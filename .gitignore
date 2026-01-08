@@ -177,7 +177,10 @@ benchmark_data
 *.pk # Don't store binary pickle files
 runs*
 
-benchmark_datasets
+llmc_config_files/
+results/runs/
+runs_debug_model/
+benchmark_datasets/
 /extras/
 /models/
 /compression/models/
@@ -185,4 +188,3 @@ llm-awq/
 llmc_log
 *log
 *pid
-llmc_config_files/

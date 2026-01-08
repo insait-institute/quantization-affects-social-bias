@@ -104,7 +104,7 @@ class VLLMCausalLM(BaseModel):
 
         self.kvc_allowed_quant = ["auto", "fp8", "fp8_e4m3", "fp8_e5m2"]
         self.model_path = config.name
-        print(self.model_path)
+        print(f"[INFO] Model path {self.model_path}")
 
         self.tokenizer_path = self.model_path if config.tokenizer_name is None else config.tokenizer_name
 
@@ -112,7 +112,7 @@ class VLLMCausalLM(BaseModel):
             self.num_gpus = torch.cuda.device_count()
         else:
             self.num_gpus = 1
-        print(f"Using {self.num_gpus} GPUs for VLLM model: {self.model_path}")
+        print(f"[INFO] Using {self.num_gpus} GPUs for VLLM model: {self.model_path}")
 
         self.model = self._load_model()
         self._max_length = self.model.llm_engine.model_config.max_model_len
@@ -123,15 +123,12 @@ class VLLMCausalLM(BaseModel):
         self.sampling_params = self._set_sampling_params(config.generation_args)
         self.num_pmt_toks, self.num_gen_toks, self.num_tot_prmt, self.num_tot_gens = 0, 0, 0, 0
 
-    # TO implement
     def loglikelihood(self, prompts):
         return self._loglikelihood(prompts)[0]
     
-    # TO implement
     def perplexities(self, prompts):
         return self._loglikelihood(prompts)[1]
 
-    # TO implement
     def most_prob_options(self, prompts, anwers, get_soft_max=True):
         get_logits = VLLMLogitsRetriever(self.tokenizer, anwers)
         temp_sampling_params = self._get_temp_updated_sampling_params({"max_tokens" : 1, "detokenize" : True, "truncate_prompt_tokens" : self._max_length, "logits_processors" : [get_logits]})
@@ -151,7 +148,6 @@ class VLLMCausalLM(BaseModel):
 
         return outputs
 
-    # TO implement
     def generate(self, input, n=1, max_tokens=None):
         flag_regroup = False
         if n > 1:
@@ -182,20 +178,16 @@ class VLLMCausalLM(BaseModel):
 
         return list_output
     
-    # TO implement
     def generate_chat(self, chats, add_generation_prompt=False, continue_final_message=True, *args, **kwargs):
         tokenized_chat = self.tokenizer.apply_chat_template(chats, tokenize=False, add_generation_prompt=add_generation_prompt, continue_final_message=continue_final_message)
         return self.generate(tokenized_chat, *args, **kwargs)
     
-    # TO implement
     def reset_statistic(self):
         self.num_pmt_toks, self.num_gen_toks, self.num_tot_prmt, self.num_tot_gens = 0, 0, 0, 0
 
-    # TO implement
     def get_statistic(self):
         return {"num_pmt_toks" : int(self.num_pmt_toks), "num_gen_toks" : int(self.num_gen_toks), "num_tot_prmt" : int(self.num_tot_prmt), "num_tot_gens" : int(self.num_tot_gens)}
     
-    # TO implement
     def get_num_gen_tokens(self, texts):
         encodings = self.tokenizer.batch_encode_plus(texts, add_special_tokens=False, return_attention_mask=False, return_token_type_ids=False)
         return [len(ids) for ids in encodings['input_ids']]
