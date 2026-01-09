@@ -11,10 +11,10 @@ This repository includes the code and scripts to reproduce the experiments prese
 
 ## Abstract
 This work presents a comprehensive evaluation of how quantization affects model bias, with particular attention to its impact on individual demographic subgroups.
-We focus on weight and activation quantization strategies and examine their effects across a broad range of bias types, including stereotypes, toxicity, sentiment, and fairness.
-We employ both probabilistic and generated text-based metrics across nine benchmarks and evaluate models varying in architecture family and reasoning ability.
+We focus on weight and activation quantization strategies and examine their effects across a broad range of bias types, including stereotypes, fairness, toxicity, and sentiment.
+We employ both probability- and generated text-based metrics across 13 benchmarks and evaluate models that differ in architecture family and reasoning ability.
 Our findings show that quantization has a nuanced impact on bias: while it can reduce model toxicity and does not significantly impact sentiment, it tends to slightly increase stereotypes and unfairness in generative tasks, especially under aggressive compression.
-These trends are generally consistent across demographic categories and model types, although their magnitude depends on the specific setting.
+These trends are generally consistent across demographic categories and subgroups, and model types, although their magnitude depends on the specific setting.
 Overall, our results highlight the importance of carefully balancing efficiency and ethical considerations when applying quantization in practice.
 
 ---

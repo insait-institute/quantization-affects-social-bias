@@ -27,8 +27,16 @@
 
   <title>How Quantization Shapes Bias in Large Language Models</title>
   <link rel="icon" type="image/x-icon" href="static/images/icon.ico">
-  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
-  rel="stylesheet">
+  <!-- link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro rel="stylesheet">" -->
+  <style>
+  body, p, li, .caption, .publication-authors, .content { font-family: 'Times New Roman', Times, serif; font-weight: 400; font-size: 16px; line-height: 1.5; color: #000; }
+  h1, h2, h3, .title, .subtitle { font-family: 'Times New Roman', Times, serif; font-weight: bold; }
+  a { font-family: 'Times New Roman', Times, serif; text-decoration: none; color: #00008B; }
+  .hero, .section { font-family: 'Times New Roman', Times, serif; }
+  </style>
+
+
+  
 
   <link rel="stylesheet" href="static/css/bulma.min.css">
   <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
@@ -160,10 +168,10 @@
         <div class="content has-text-justified">
           <p>
             This work presents a comprehensive evaluation of how quantization affects model bias, with particular attention to its impact on individual demographic subgroups.
-We focus on weight and activation quantization strategies and examine their effects across a broad range of bias types, including stereotypes, toxicity, sentiment, and fairness.
-We employ both probabilistic and generated text-based metrics across nine benchmarks and evaluate models varying in architecture family and reasoning ability.
+We focus on weight and activation quantization strategies and examine their effects across a broad range of bias types, including stereotypes, fairness, toxicity, and sentiment.
+We employ both probability- and generated text-based metrics across 13 benchmarks and evaluate models that differ in architecture family and reasoning ability.
 Our findings show that quantization has a nuanced impact on bias: while it can reduce model toxicity and does not significantly impact sentiment, it tends to slightly increase stereotypes and unfairness in generative tasks, especially under aggressive compression.
-These trends are generally consistent across demographic categories and model types, although their magnitude depends on the specific setting.
+These trends are generally consistent across demographic categories and subgroups, and model types, although their magnitude depends on the specific setting.
 Overall, our results highlight the importance of carefully balancing efficiency and ethical considerations when applying quantization in practice.
           </p>
         </div>
@@ -290,7 +298,7 @@ Overall, our results highlight the importance of carefully balancing efficiency 
 <section class="section hero is-light">
     <div class="container is-max-desktop content">
       <h2><a href="#citation" class="header-link">Citation</a></h2>
-<pre id="BibTeX">@article{marcuzzi2025quantizationshapesbiaslarge,
+<pre id="BibTeX">@article{marcuzzi2026quantizationshapesllmsbias,
     author    = {Federico Marcuzzi and Xuefei Ning and Roy Schwartz and Iryna Gurevych},
     title     = {How Quantization Shapes Bias in Large Language Models},
     booktitle = {Proceedings of the 19th Conference of the European Chapter of the Association for Computational Linguistics, {EACL} 2026 - Volume 1: Long Papers, Rabat, Morocco, March 24-29, 2026},
