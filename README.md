@@ -140,13 +140,14 @@ python helper_tools/compute_model_size.py
 
 ## Citation
 ```
-@article{marcuzzi2025quantizationshapesbiaslarge,
-    title={How Quantization Shapes Bias in Large Language Models}, 
-    author={Federico Marcuzzi and Xuefei Ning and Roy Schwartz and Iryna Gurevych},
-    year={2025},
-    eprint={2508.18088},
-    archivePrefix={arXiv},
-    primaryClass={cs.CL},
-    url={https://arxiv.org/abs/2508.18088}
+@article{marcuzzi2026quantizationshapesllmsbias,
+    author    = {Federico Marcuzzi and Xuefei Ning and Roy Schwartz and Iryna Gurevych},
+    title     = {How Quantization Shapes Bias in Large Language Models},
+    booktitle = {Proceedings of the 19th Conference of the European Chapter of the Association for Computational Linguistics, {EACL} 2026 - Volume 1: Long Papers, Rabat, Morocco, March 24-29, 2026},
+    pages     = {To appear},
+    publisher = {Association for Computational Linguistics},
+    year      = {2026},
+    url       = {https://arxiv.org/abs/2508.18088},
+    note      = {Accepted to the main conference (EACL 2026)}
 }
 ```
