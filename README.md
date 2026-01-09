@@ -2,12 +2,12 @@
   <img src="https://github.com/insait-institute/quantization-affects-social-bias/blob/master/docs/static/images/example_gh.svg" width="100%">
 </p>
 
-# How Quantization Shapes Bias in Large Language Models
+# How Quantization Shapes Bias in LLMs
 
 > #### Federico Marcuzzi, Xuefei Ning, Roy Schwartz, and Iryna Gurevych
 >
 
-This repository includes the code and scripts to reproduce the experiments presented in the arXiv paper [How Quantization Shapes Bias in Large Language Models](https://arxiv.org/abs/2508.18088). The code can also be used to test social bias on large language models compatible with the HuggingFace library. Our framework is built on top of [COMPL-AI](https://github.com/compl-ai/compl-ai).
+This repository includes the code and scripts to reproduce the experiments presented in the EACL 2026 paper [How Quantization Shapes Bias in Large Language Models](https://arxiv.org/abs/2508.18088) (paper [website](https://insait-institute.github.io/quantization-affects-social-bias/)). The code can also be used to test social bias on large language models compatible with the HuggingFace library. Our framework is built on top of [COMPL-AI](https://github.com/compl-ai/compl-ai).
 
 ## Abstract
 This work presents a comprehensive evaluation of how quantization affects model bias, with particular attention to its impact on individual demographic subgroups.
