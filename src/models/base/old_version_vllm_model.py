@@ -1,4 +1,4 @@
-#    Copyright 2026 Federico Marcuzzi, INSAIT
+#    Copyright 2025 Federico Marcuzzi, INSAIT
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -13,25 +13,80 @@
 #    limitations under the License.
 
 
-from src.models.base.utils_vllm import *
-
-import torch
-import numpy as np
-
 from .base_model import BaseModel
 from src.configs.base_model_config import DEVICE, ModelProvider
 
 from transformers import AutoTokenizer
-import vllm
 from vllm import LLM, SamplingParams
 
+import numpy as np
+import torch
+
+
+class VLLMLogitsRetriever:
+    def __init__(self, tokenizer, options_map):
+        self.base_to_toks = {base : [] for base in options_map.keys()}
+        self.id_to_tok = {}
+        self.tok_to_base = {}
+
+        for base, toks in options_map.items():
+            for tok in toks:
+                id = tokenizer.encode(tok, add_special_tokens=False)
+                if len(id) > 1:
+                    print(f"[Info] - Option <{tok}> has more than one token id: {id}. Excluded")
+                else:
+                    self.base_to_toks[base].append(tok)
+                    self.id_to_tok[id[-1]] = tok
+                    self.tok_to_base[tok] = base
+
+        self.soft_max = {k : [] for k in self.base_to_toks.keys()}
+        self.is_top = []
+        self.pred = []
+        self.prob = []
+        self.tokenizer = tokenizer
+
+    def __call__(self, token_ids, logits):
+        if token_ids == ():
+            ids = list(self.id_to_tok.keys())
+            ans_str = list(self.tok_to_base.keys())
+
+            most_prop_tok = torch.argmax(logits)
+            self.is_top.append(most_prop_tok in ids)
+
+            soft_max = torch.nn.functional.softmax(logits, dim=0).to(dtype=float).cpu().numpy()
+            sub_logits = soft_max[ids]
+            self.pred.append(self.tok_to_base[ans_str[np.argmax(sub_logits)]])
+
+            prob_sum = {k : 0 for k in self.base_to_toks.keys()}
+            for ans, sm in zip(ans_str, sub_logits):
+                prob_sum[self.tok_to_base[ans]] += sm
+                
+            for k, v in prob_sum.items():
+                self.soft_max[k].append(v)
+
+            self.prob.append(sum(prob_sum.values()))
+
+        return logits
+
+    def get_answers(self):
+        return self.pred
+    
+    def get_soft_max(self):
+        return self.soft_max
+    
+    def get_all(self):
+        return {
+            "answers" : self.pred,
+            "soft_max" : self.soft_max,
+            "prob_sum" : self.prob,
+            "is_top" : self.is_top
+        }
 
 class VLLMCausalLM(BaseModel):
     AUTO_TOKENIZER_CLASS = AutoTokenizer
     AUTO_MODEL_CLASS = LLM
 
     def __init__(self, config):
-        print("[INFO] vllm version:", vllm.__version__)
         super().__init__(config)
 
         self._batch_size = config.batch_size
@@ -40,15 +95,18 @@ class VLLMCausalLM(BaseModel):
         self._device = ("cuda" if config.device in [DEVICE.AUTO, DEVICE.CUDA] and torch.cuda.is_available() else config.device.value)
         self._generation_args = config.generation_args
         self._dtype = config.dtype
+        self._trust_remote_code = config.trust_remote_code
+        self._padding_side = config.padding_side
         self._provider = config.provider
         self._seed = config.seed
-        self.model_path = config.name
-        self.tokenizer_path = config.tokenizer_name
 
         assert (self._provider == ModelProvider.VLLM)
 
         self.kvc_allowed_quant = ["auto", "fp8", "fp8_e4m3", "fp8_e5m2"]
-        print(f"[INFO] Model path: {self.model_path}")
+        self.model_path = config.name
+        print(f"[INFO] Model path {self.model_path}")
+
+        self.tokenizer_path = self.model_path if config.tokenizer_name is None else config.tokenizer_name
 
         if self._device == "cuda":
             self.num_gpus = torch.cuda.device_count()
@@ -64,27 +122,18 @@ class VLLMCausalLM(BaseModel):
 
         self.sampling_params = self._set_sampling_params(config.generation_args)
         self.num_pmt_toks, self.num_gen_toks, self.num_tot_prmt, self.num_tot_gens = 0, 0, 0, 0
-    
-    # TO implement
+
     def loglikelihood(self, prompts):
         return self._loglikelihood(prompts)[0]
     
-    # TO implement
     def perplexities(self, prompts):
         return self._loglikelihood(prompts)[1]
 
-    # TO implement
-    def most_prob_options(self, prompts, anwers, get_soft_max=True, n=1):
-        if VLLM_VERSION <= Version("0.7.2"):
-            get_logits = VLLMLogitsRetriever(self.tokenizer, anwers)
-            temp_sampling_params = self._get_temp_updated_sampling_params({"max_tokens" : 1, "detokenize" : True, "logits_processors" : [get_logits]})
-            outputs = self.model.generate(prompts, sampling_params=temp_sampling_params)
-        else:
-            get_logits = VLLMLogitsRetrieverNew(self.tokenizer, anwers, prompts)
-            list_sp = get_logits.get_sample_params_list(self._generation_args, {"max_tokens" : 1, "detokenize" : True})
-            outputs = self.model.generate(prompts, sampling_params=list_sp)
-            get_logits.compute_data()        
-    
+    def most_prob_options(self, prompts, anwers, get_soft_max=True):
+        get_logits = VLLMLogitsRetriever(self.tokenizer, anwers)
+        temp_sampling_params = self._get_temp_updated_sampling_params({"max_tokens" : 1, "detokenize" : True, "truncate_prompt_tokens" : self._max_length, "logits_processors" : [get_logits]})
+        outputs = self.model.generate(prompts, sampling_params=temp_sampling_params)
+
         for prompts in outputs:
             # statistics:
             self.num_pmt_toks += len(prompts.prompt_token_ids)
@@ -99,7 +148,6 @@ class VLLMCausalLM(BaseModel):
 
         return outputs
 
-    # TO implement
     def generate(self, input, n=1, max_tokens=None):
         flag_regroup = False
         if n > 1:
@@ -129,22 +177,17 @@ class VLLMCausalLM(BaseModel):
             list_output = np.array(list_output).reshape(-1, n).tolist()
 
         return list_output
-
-    # TO implement
-    def generate_chat(self, chats, add_generation_prompt=False, continue_final_message=True, *args, **kwargs):
-        tokenized_chats = self.tokenizer.apply_chat_template(chats, tokenize=True, add_generation_prompt=add_generation_prompt, continue_final_message=continue_final_message)
-        tokenized_chats = [{"prompt_token_ids": list(t)} for t in tokenized_chats]
-        return self.generate(tokenized_chats, *args, **kwargs)
     
-    # TO implement
+    def generate_chat(self, chats, add_generation_prompt=False, continue_final_message=True, *args, **kwargs):
+        tokenized_chat = self.tokenizer.apply_chat_template(chats, tokenize=False, add_generation_prompt=add_generation_prompt, continue_final_message=continue_final_message)
+        return self.generate(tokenized_chat, *args, **kwargs)
+    
     def reset_statistic(self):
         self.num_pmt_toks, self.num_gen_toks, self.num_tot_prmt, self.num_tot_gens = 0, 0, 0, 0
 
-    # TO implement
     def get_statistic(self):
         return {"num_pmt_toks" : int(self.num_pmt_toks), "num_gen_toks" : int(self.num_gen_toks), "num_tot_prmt" : int(self.num_tot_prmt), "num_tot_gens" : int(self.num_tot_gens)}
     
-    # TO implement
     def get_num_gen_tokens(self, texts):
         encodings = self.tokenizer.batch_encode_plus(texts, add_special_tokens=False, return_attention_mask=False, return_token_type_ids=False)
         return [len(ids) for ids in encodings['input_ids']]
@@ -164,18 +207,12 @@ class VLLMCausalLM(BaseModel):
 
             print(f"Using model with quantized kv_cache_dtype: {self._quantized}")
             kvargs = {"kv_cache_dtype": self._quantized, "calculate_kv_scales" : True}
-    
-        if VLLM_VERSION <= Version("0.7.2"):
-            return self.AUTO_MODEL_CLASS(model=self.model_path, tokenizer=tokenizer_path, max_num_seqs=self._batch_size, tensor_parallel_size=self.num_gpus, gpu_memory_utilization=0.8,
-                                         seed=self._seed, enforce_eager=False, dtype=self._dtype, device=self._device, **kvargs)
-        else:
-            return self.AUTO_MODEL_CLASS(model=self.model_path, tokenizer=tokenizer_path, max_num_seqs=self._batch_size, tensor_parallel_size=self.num_gpus, gpu_memory_utilization=0.8, 
-                                         seed=self._seed, enforce_eager=False, dtype=self._dtype, logits_processors = [WrappedPerReqLogitsRetriever], **kvargs)
+
+        return self.AUTO_MODEL_CLASS(model=self.model_path, tokenizer=tokenizer_path, trust_remote_code=self._trust_remote_code, max_num_seqs=self._batch_size, tensor_parallel_size=self.num_gpus, gpu_memory_utilization=0.8, dtype=self._dtype, device=self._device, enforce_eager=True, seed=self._seed, **kvargs)
 
     def _load_tokenizer(self):
-        if self.tokenizer_path:
-            return self.AUTO_TOKENIZER_CLASS.from_pretrained(self.tokenizer_path)
-        return self.model.get_tokenizer()
+        tokenizer_path = self.tokenizer_path if self.tokenizer_path else self.model_path
+        return self.AUTO_TOKENIZER_CLASS.from_pretrained(tokenizer_path, trust_remote_code=self._trust_remote_code, padding_side=self._padding_side)
 
     def _set_sampling_params(self, generation_args):
         if len(generation_args) == 0:
@@ -184,7 +221,7 @@ class VLLMCausalLM(BaseModel):
             return SamplingParams(**generation_args)
     
     def _loglikelihood(self, prompts):
-        sp = SamplingParams(prompt_logprobs=0, temperature=1, max_tokens=1)
+        sp = SamplingParams(prompt_logprobs=0, temperature=1, max_tokens=1, truncate_prompt_tokens=self._max_length)
         with torch.no_grad():
             model_output = self.model.generate(prompts, sampling_params=sp)
         

@@ -16,34 +16,9 @@ from typing import Dict, Type
 
 from src.configs.base_modifier_config import ModifierConfig
 from src.modifiers.base_modifier import BaseModifier
-from src.modifiers.perturbations.contraction_expansion_perturbation import (
-    ContractionPerturbation,
-    ExpansionPerturbation,
-)
-from src.modifiers.perturbations.dialect_perturbation import DialectPerturbation
-from src.modifiers.perturbations.filler_words_perturbation import (
-    FillerWordsPerturbation,
-)
-from src.modifiers.perturbations.gender_perturbation import GenderPerturbation
-from src.modifiers.perturbations.lowercase_perturbation import LowerCasePerturbation
-from src.modifiers.perturbations.misspelling_perturbation import MisspellingPerturbation
-from src.modifiers.perturbations.paraphrase_perturbation import ParaphrasePerturbation
-from src.modifiers.perturbations.space_perturbation import SpacePerturbation
-from src.modifiers.perturbations.synonym_perturbation import SynonymPerturbation
-from src.modifiers.perturbations.typos_perturbation import TyposPerturbation
+
 
 MODIFIER_MAP: Dict[str, Type[BaseModifier]] = {
-    "dialect": DialectPerturbation,
-    "typos": TyposPerturbation,
-    "contraction": ContractionPerturbation,
-    "expansion": ExpansionPerturbation,
-    "misspelling": MisspellingPerturbation,
-    "lowercase": LowerCasePerturbation,
-    "filler-words": FillerWordsPerturbation,
-    "spaces": SpacePerturbation,
-    "gender": GenderPerturbation,
-    "synonym": SynonymPerturbation,
-    "paraphrase": ParaphrasePerturbation,
 }
 
 

@@ -1,0 +1,20 @@
+name: bias_eval
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10.*
+  - pip
+  - pip:
+      - vllm==0.17.1
+      - ipykernel
+      - pandas
+      - datasets
+      - pyyaml-include==1.3.2
+      - yamlize==0.7.1
+      - scipy
+      - fairlearn==0.10.0
+      - nltk
+      - spacy
+      - -e ./external/vaderSentiment
