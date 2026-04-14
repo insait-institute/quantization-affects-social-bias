@@ -13,7 +13,12 @@
 #    limitations under the License.
 
 
+import torch
+import numpy as np
+import time
 import os
+import tempfile
+import shutil
 from importlib.metadata import version, PackageNotFoundError
 from packaging.version import Version, InvalidVersion
 
@@ -23,14 +28,6 @@ try:
 except (PackageNotFoundError, InvalidVersion):
     VLLM_VERSION = None
 
-if VLLM_VERSION and VLLM_VERSION <= Version("0.7.2"):
-    os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
-
-
-import torch
-import numpy as np
-from multiprocessing import Queue
-import time
 
 # VLLM 0.7.2 Logits Retriever
 class VLLMLogitsRetriever:
@@ -43,7 +40,7 @@ class VLLMLogitsRetriever:
             for tok in toks:
                 id = tokenizer.encode(tok, add_special_tokens=False)
                 if len(id) > 1:
-                    print(f"[Info] - Option <{tok}> has more than one token id: {id}. Excluded")
+                    #print(f"[Info] - Option <{tok}> has more than one token id: {id}. Excluded")
                     continue
                 else:
                     self.base_to_toks[base].append(tok)
@@ -94,15 +91,13 @@ class VLLMLogitsRetriever:
         }
 
 
-# VLLM 0.15.0 Logits Retriever
+# VLLM 0.17.1 Logits Retriever
 if VLLM_VERSION > Version("0.7.2"):
     from vllm.config import VllmConfig
     from vllm.v1.sample.logits_processor import AdapterLogitsProcessor, RequestLogitsProcessor
     from vllm import SamplingParams
 
     class VLLMLogitsRetrieverNew:
-        queue = Queue()
-
         def __init__(self, tokenizer, options_map, prompts):
             self.base_to_toks = {base : [] for base in options_map.keys()}
             self.id_to_tok = {}
@@ -113,7 +108,7 @@ if VLLM_VERSION > Version("0.7.2"):
                 for tok in toks:
                     id = tokenizer.encode(tok, add_special_tokens=False)
                     if len(id) > 1:
-                        print(f"[Info] - Option <{tok}> has more than one token id: {id}. Excluded")
+                        #print(f"[Info] - Option <{tok}> has more than one token id: {id}. Excluded")
                         continue
                     else:
                         self.base_to_toks[base].append(tok)
@@ -125,22 +120,31 @@ if VLLM_VERSION > Version("0.7.2"):
             self.pred = []
             self.prob = []
             self.tokenizer = tokenizer
+            
+            self.temp_dir = tempfile.mkdtemp(prefix="vllm_logits_")
 
         def compute_data(self):
             start_time = time.time()
             last_print = start_time
 
             self.all_logits = {}
-            while len(self.all_logits) < self.n_prompts:
-                if VLLMLogitsRetrieverNew.queue.empty():
+            
+            for prompt_id in range(self.n_prompts):
+                file_path = os.path.join(self.temp_dir, f"{prompt_id}.pt")
+                
+                while not os.path.exists(file_path):
                     now = time.time()
                     if now - last_print >= 10:
                         waited = int(now - start_time)
-                        print(f"Waiting for logits... {waited} seconds elapsed", len(self.all_logits), self.n_prompts)
+                        print(f"Waiting for logits... {waited} seconds elapsed. Got {len(self.all_logits)}/{self.n_prompts}")
                         last_print = now
-                    continue
-                prpmpt_id, logits = VLLMLogitsRetrieverNew.queue.get()
-                self.all_logits[prpmpt_id] = logits
+                    time.sleep(0.01)
+                
+                logits = torch.load(file_path, weights_only=True)
+                self.all_logits[prompt_id] = logits
+                os.remove(file_path)
+
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
 
             for id in np.arange(self.n_prompts):
                 self._data(self.all_logits[id])
@@ -184,17 +188,26 @@ if VLLM_VERSION > Version("0.7.2"):
             for prompt_id in range(self.n_prompts):
                 cp_sp_params = sp_params.copy()
                 cp_sp_params.update(new_params)
-                cp_sp_params.update({"extra_args" : {"prompt_id": prompt_id}})
+                cp_sp_params.update({"extra_args" : {"prompt_id": prompt_id, "temp_dir": self.temp_dir}})
                 list_sp.append(SamplingParams(**cp_sp_params))        
             return list_sp
 
+
     class PerReqLogitsRetriever:
-        def __init__(self, queue, prompt_id: int) -> None:
-            self.queue = queue
+        def __init__(self, temp_dir: str, prompt_id: int) -> None:
+            self.temp_dir = temp_dir
             self.prompt_id = prompt_id
+            self.saved = False
 
         def __call__(self, output_ids: list[int], logits: torch.Tensor,) -> torch.Tensor:
-            self.queue.put((self.prompt_id, logits.detach().cpu()))
+            if not self.saved:
+                tmp_path = os.path.join(self.temp_dir, f"{self.prompt_id}.tmp")
+                final_path = os.path.join(self.temp_dir, f"{self.prompt_id}.pt")
+                
+                torch.save(logits.detach().cpu(), tmp_path)
+                os.rename(tmp_path, final_path)
+                self.saved = True
+                
             return logits
 
     class WrappedPerReqLogitsRetriever(AdapterLogitsProcessor):
@@ -206,13 +219,19 @@ if VLLM_VERSION > Version("0.7.2"):
 
         def __init__(self, vllm_config: VllmConfig, device: torch.device, is_pin_memory: bool):
             super().__init__(vllm_config, device, is_pin_memory)
-            self.is_cuda = device.type == "cuda"
-            self.queue = VLLMLogitsRetrieverNew.queue
+            self.is_cuda = device.type == "cuda" 
 
         def is_argmax_invariant(self) -> bool:
             return False
 
         def new_req_logits_processor(self, params: SamplingParams,) -> RequestLogitsProcessor | None:
-            if (not self.is_cuda or (prompt_id := params.extra_args and params.extra_args.get("prompt_id")) is None):
+            if not self.is_cuda or params.extra_args is None:
                 return None
-            return PerReqLogitsRetriever(self.queue, prompt_id)
+            
+            prompt_id = params.extra_args.get("prompt_id")
+            temp_dir = params.extra_args.get("temp_dir")
+
+            if prompt_id is None or temp_dir is None:
+                return None
+                
+            return PerReqLogitsRetriever(temp_dir, prompt_id)
