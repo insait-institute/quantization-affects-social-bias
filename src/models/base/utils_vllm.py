@@ -14,6 +14,7 @@
 
 
 import torch
+import torch.distributed as dist
 import numpy as np
 import time
 import os
@@ -203,8 +204,9 @@ if VLLM_VERSION > Version("0.7.2"):
             if not self.saved:
                 tmp_path = os.path.join(self.temp_dir, f"{self.prompt_id}.tmp")
                 final_path = os.path.join(self.temp_dir, f"{self.prompt_id}.pt")
-                
-                torch.save(logits.detach().cpu(), tmp_path)
+
+                logits_to_save = logits.detach().clone().cpu()
+                torch.save(logits_to_save, tmp_path)
                 os.rename(tmp_path, final_path)
                 self.saved = True
                 
@@ -232,6 +234,11 @@ if VLLM_VERSION > Version("0.7.2"):
             temp_dir = params.extra_args.get("temp_dir")
 
             if prompt_id is None or temp_dir is None:
+                return None
+
+            is_rank_0 = not dist.is_initialized() or dist.get_rank() == 0
+            
+            if not is_rank_0:
                 return None
                 
             return PerReqLogitsRetriever(temp_dir, prompt_id)
